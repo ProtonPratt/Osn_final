@@ -11,6 +11,8 @@
 int server_port=8080;
 int client_port=5566;
 #define MAX_CLIENTS 5
+#define MAX_CLIENT_PATHS 128
+#define MAX_CLIENT_PATH_LENGTH 1024
 
 // Define a structure to store client data
 struct ClientInfo {
@@ -19,6 +21,8 @@ struct ClientInfo {
     int server_port;
     int client_port;
     int id;
+     int num_paths;
+     char paths[MAX_CLIENT_PATHS][MAX_CLIENT_PATH_LENGTH];
 };
 
 struct ClientInfo clients[MAX_CLIENTS];
@@ -113,7 +117,7 @@ void *handle_connections(void *arg) {
 void *handle_client(void *arg) {
     struct ClientInfo *client_info = (struct ClientInfo *)arg;
     int client_socket = client_info->client_socket;
-    char buffer[1024];
+    char buffer[4096]; // Adjust the size as needed
     int valread;
 
     // Read the data sent by the client
@@ -135,25 +139,34 @@ void *handle_client(void *arg) {
             } else if (count == 2) {
                 client_info->client_port = atoi(token);
                 client_info->id = client_info->client_port - client_info->server_port;
+            } else if (count == 3) {
+                client_info->num_paths = atoi(token);
+            } else if (count >= 4 && count < 4 + client_info->num_paths) {
+                // Copy paths into the ClientInfo structure
+                strcpy(client_info->paths[count - 4], token);
             }
             token = strtok(NULL, " ");
             count++;
         }
 
-        printf("%s %d %d %d %d\n", client_info->client_ip, client_info->client_socket, client_info->client_port, client_info->server_port, client_info->id);
+        printf("Client Info:\n");
+        printf("IP: %s\n", client_info->client_ip);
+        printf("Server Port: %d\n", client_info->server_port);
+        printf("Client Port: %d\n", client_info->client_port);
+        printf("ID: %d\n", client_info->id);
+        printf("Number of Paths: %d\n", client_info->num_paths);
+        printf("Paths:\n");
+        for (int i = 0; i < client_info->num_paths; ++i) {
+            printf("%s\n", client_info->paths[i]);
+        }
 
         // Send an acknowledgment back to the client
         char ack[] = "Acknowledgment: Data received";
         write(client_socket, ack, strlen(ack));
     }
 
-    // Clear the client socket in the array
-    // pthread_mutex_lock(&mutex);
-    // client_info->client_socket = 0;
-    // pthread_mutex_unlock(&mutex);
-
-    // // Close the client socket
-    // close(client_socket);
+    // Close the client socket
+    close(client_socket);
 
     // Exit the thread
     pthread_exit(NULL);
