@@ -1,0 +1,388 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+#include <pthread.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+
+// #define SERVER_PORT 8080
+// #define CLIENT_PORT 5566
+int server_port = 5567;
+int client_port = 5566;
+#define MAX_CLIENTS 5
+#define MAX_CLIENT_PATHS 128
+#define MAX_CLIENT_PATH_LENGTH 1024
+
+// Define a structure to store client data
+struct ClientInfo
+{
+    int client_socket;
+    char client_ip[16]; // Store IP address as a string
+    int server_port;
+    int client_port;
+    int id;
+    int num_paths;
+    char paths[MAX_CLIENT_PATHS][MAX_CLIENT_PATH_LENGTH];
+    char abs_path[MAX_CLIENT_PATH_LENGTH];
+};
+
+struct ClientInfo clients[MAX_CLIENTS];
+pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
+
+void *handle_connections(void *arg);
+void *handle_client(void *arg);
+void *handle_connections_client(void *arg);
+
+int main()
+{
+    pthread_t server_thread, client_thread;
+
+    // Create a thread for handling server connections
+    if (pthread_create(&server_thread, NULL, handle_connections, (void *)&server_port) < 0)
+    {
+        perror("Server thread creation failed");
+        exit(EXIT_FAILURE);
+    }
+
+    // Create a thread for handling client connections
+    // if (pthread_create(&client_thread, NULL, handle_connections_client, (void *)&client_port) < 0)
+    // {
+    //     perror("Client thread creation failed");
+    //     exit(EXIT_FAILURE);
+    // }
+
+    // // Wait for threads to finish (this won't happen as they run in an infinite loop)
+    // pthread_join(client_thread, NULL);
+    pthread_join(server_thread, NULL);
+
+    return 0;
+}
+
+void *handle_connections(void *arg)
+{
+    int port = *((int *)arg); // server port
+
+    int server_fd, new_socket;
+    struct sockaddr_in address;
+    int addrlen = sizeof(address);
+
+    // Create socket
+    if ((server_fd = socket(AF_INET, SOCK_STREAM, 0)) == 0)
+    {
+        perror("Socket creation failed");
+        exit(EXIT_FAILURE);
+    }
+
+    address.sin_family = AF_INET;
+    address.sin_addr.s_addr = INADDR_ANY;
+    address.sin_port = htons(port);
+
+    // Bind the socket
+    if (bind(server_fd, (struct sockaddr *)&address, sizeof(address)) < 0)
+    {
+        perror("Bind failed");
+        exit(EXIT_FAILURE);
+    }
+
+    // Listen for incoming connections
+    if (listen(server_fd, MAX_CLIENTS) < 0)
+    {
+        perror("Listen failed");
+        exit(EXIT_FAILURE);
+    }
+
+    printf("Server listening on port %d...\n", port);
+
+    while (1)
+    {
+        // Accept a new connection
+        if ((new_socket = accept(server_fd, (struct sockaddr *)&address, (socklen_t *)&addrlen)) < 0)
+        {
+            perror("Accept failed");
+            exit(EXIT_FAILURE);
+        }
+
+        // Find an available slot in the array
+        pthread_mutex_lock(&mutex);
+
+        int i;
+        for (i = 0; i < MAX_CLIENTS; i++)
+        {
+            if (clients[i].client_socket == 0)
+            {
+                clients[i].client_socket = new_socket;
+
+                // Create a thread to handle the new connection
+                pthread_t thread;
+                if (pthread_create(&thread, NULL, handle_client, (void *)&clients[i]) < 0)
+                {
+                    perror("Thread creation failed");
+                    exit(EXIT_FAILURE);
+                }
+                break;
+            }
+        }
+
+        pthread_mutex_unlock(&mutex);
+    }
+}
+
+void *handle_client(void *arg)
+{
+    struct ClientInfo *client_info = (struct ClientInfo *)arg;
+    int client_socket = client_info->client_socket;
+    char buffer[4096]; // Adjust the size as needed
+    int valread;
+
+    // Read the data sent by the client
+    valread = read(client_socket, buffer, sizeof(buffer));
+    if (valread <= 0)
+    {
+        // Client disconnected or an error occurred
+        close(client_socket);
+    }
+    else
+    {
+        char *token;
+        char *saveptr; // for strtok_r
+        int count = 0;
+
+        token = strtok_r(buffer, " ", &saveptr);
+
+        while (token != NULL)
+        {
+            if (count == 0)
+            {
+                strcpy(client_info->client_ip, token);
+            }
+            else if (count == 1)
+            {
+                client_info->server_port = atoi(token);
+            }
+            else if (count == 2)
+            {
+                client_info->client_port = atoi(token);
+                client_info->id = client_info->client_port - client_info->server_port;
+            }
+            else if (count == 3)
+            {
+                client_info->num_paths = atoi(token);
+            }
+            else if (count == 4)
+            {
+                strcpy(client_info->abs_path, token);
+            }
+            else if (count >= 5 && count < 5 + client_info->num_paths)
+            {
+                // Copy paths into the ClientInfo structure
+                strcpy(client_info->paths[count - 5], token);
+            }
+            token = strtok_r(NULL, " ", &saveptr);
+            count++;
+        }
+
+
+        printf("Client Info:\n");
+        printf("IP: %s\n", client_info->client_ip);
+        printf("Server Port: %d\n", client_info->server_port);
+        printf("Client Port: %d\n", client_info->client_port);
+        printf("ID: %d\n", client_info->id);
+        printf("Number of Paths: %d\n", client_info->num_paths);
+        printf("Actual path:%s\n", client_info->abs_path);
+        printf("Paths:\n");
+        for (int i = 0; i < client_info->num_paths; ++i)
+        {
+            printf("%s\n", client_info->paths[i]);
+        }
+
+        // Send an acknowledgment back to the client
+        char ack[] = "Acknowledgment: Data received";
+        write(client_socket, ack, strlen(ack));
+    }
+
+    // Close the client socket
+    // close(client_socket);
+
+    // Exit the thread
+    pthread_exit(NULL);
+}
+
+void *handle_connections_client(void *arg)
+{
+    int port = *((int *)arg);
+
+    int server_fd, new_socket;
+    struct sockaddr_in address;
+    int addrlen = sizeof(address);
+
+    // Create socket
+    if ((server_fd = socket(AF_INET, SOCK_STREAM, 0)) == 0)
+    {
+        perror("Socket creation failed");
+        exit(EXIT_FAILURE);
+    }
+
+    address.sin_family = AF_INET;
+    address.sin_addr.s_addr = INADDR_ANY;
+    address.sin_port = htons(port);
+
+    // Bind the socket
+    if (bind(server_fd, (struct sockaddr *)&address, sizeof(address)) < 0)
+    {
+        perror("Bind failed");
+        exit(EXIT_FAILURE);
+    }
+
+    // Listen for incoming connections
+    if (listen(server_fd, MAX_CLIENTS) < 0)
+    {
+        perror("Listen failed");
+        exit(EXIT_FAILURE);
+    } // Bind the socket
+    if (bind(server_fd, (struct sockaddr *)&address, sizeof(address)) < 0)
+    {
+        perror("Bind failed");
+        exit(EXIT_FAILURE);
+    }
+
+    printf("Server listening on port %d for client...\n", port);
+
+    while (1)
+    {
+        // Accept a new connection
+        if ((new_socket = accept(server_fd, (struct sockaddr *)&address, (socklen_t *)&addrlen)) < 0)
+        {
+            perror("Accept failed");
+            exit(EXIT_FAILURE);
+        }
+
+        // Find an available slot in the array
+        pthread_mutex_lock(&mutex);
+
+        // struct ClientInfo *client_info = (struct ClientInfo *)arg;
+        // int client_socket = client_info->client_socket;
+        char buffer[1024];
+        int valread;
+
+        // printf("1\n");
+        // Read the data sent by the client
+        valread = read(new_socket, buffer, sizeof(buffer));
+
+        if (valread <= 0)
+        {
+            // printf("done 1\n");
+            // Client disconnected or an error occurred
+            close(new_socket);
+        }
+        else
+        {
+            printf("Command:%s\n", buffer);
+            // Send an acknowledgment back to the client
+            char ack[] = "Acknowledgment: Data received";
+            if (strncmp(buffer, "DELETE", 6) == 0)
+            {
+                char *pathStart = strchr(buffer, ' ') + 1; // Find the space after "CREATE f"
+                // Calculate the length of the PATH
+                size_t pathLength = strlen(pathStart) - 1; // Exclude the newline character
+                // Allocate memory for PATH and copy it
+                char *path = (char *)malloc(pathLength + 1);
+                strncpy(path, pathStart, pathLength);
+                path[pathLength] = '\0'; // Null-terminate the string
+                for (int i = 0; i < MAX_CLIENTS; i++)
+                {
+                    for (int j = 0; j < clients[i].num_paths; j++)
+                    {
+                        if (strcmp(path, clients[i].paths[j]) == 0)
+                        {
+                            if (rmdir(path) == 0)
+                            {
+                                for (int k = j; k < clients[i].num_paths - 1; k++)
+                                {
+                                    strcpy(clients[i].paths[k], clients[i].paths[k + 1]);
+                                }
+                                // Decrease the number of paths
+                                clients[i].num_paths--;
+                                break;
+                            }
+                            else
+                            {
+                                // Handle the case where the directory deletion fails
+                                // You can print an error message or take appropriate action
+                                // printf("Error deleting directory: %s\n");
+                            }
+                        }
+                    }
+                }
+
+                printf("Ack: %s\n", ack);
+                write(new_socket, ack, strlen(ack));
+            }
+
+            else if (strncmp(buffer, "COPY", 4) == 0)
+            {
+                char *token;
+                int count = 0;
+
+                token = strtok(buffer, " ");
+
+                while (token != NULL)
+                {
+                    if (count == 1)
+                    {
+                        for (int i = 0; i < MAX_CLIENTS; i++)
+                        {
+                            for (int j = 0; j < clients[i].num_paths; j++)
+                            {
+                                // if (strcmp(path, clients[i].paths[j]) == 0)
+                                // {
+                                //     if (rmdir(path) == 0)
+                                //     {
+                                //         for (int k = j; k < clients[i].num_paths - 1; k++)
+                                //         {
+                                //             strcpy(clients[i].paths[k], clients[i].paths[k + 1]);
+                                //         }
+                                //         // Decrease the number of paths
+                                //         clients[i].num_paths--;
+                                //         break;
+                                //     }
+                                //     else
+                                //     {
+                                //         // Handle the case where the directory deletion fails
+                                //         // You can print an error message or take appropriate action
+                                //         printf("Error deleting directory: %s\n");
+                                //     }
+                                // }
+                            }
+                        }
+
+                        // if (count == 2)
+                        // {
+                        //     client_info->client_port = atoi(token);
+                        //     client_info->id = client_info->client_port - client_info->server_port;
+                        // }
+                        token = strtok(NULL, " ");
+                        count++;
+                    }
+                }
+            }
+            if (strncmp(buffer, "READ", 4) == 0)
+            {
+
+            }
+
+            else if (strncmp(buffer, "WRITE", 5) == 0)
+            {
+
+            }
+
+            else if (strncmp(buffer, "GETINFO", 7) == 0)
+            {
+                
+            }
+
+        }
+
+        pthread_mutex_unlock(&mutex);
+    }
+}
