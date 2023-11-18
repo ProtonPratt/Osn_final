@@ -97,6 +97,19 @@ int main()
 
         printf("ENtered\n");
 
+        // Check if there is data to read (ACK)
+    if (FD_ISSET(sock, &readfds)) {
+        char ackBuffer[MAX_BUFFER_SIZE];
+        if (recv(sock, ackBuffer, sizeof(ackBuffer), 0) == -1) {
+            perror("Receiving ACK from server failed");
+            close(sock);
+            exit(EXIT_FAILURE);
+        }
+        // Process the acknowledgment as needed
+        printf("Received ACK from server: %s\n", ackBuffer);
+    }
+       
+
         if(strncmp(buffer,"READ",4)==0 || strncmp(buffer,"WRITE",5)==0 || strncmp(buffer,"GETINFO",7)==0)
         {
             // printf("ENtered\n");

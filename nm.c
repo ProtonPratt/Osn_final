@@ -333,7 +333,7 @@ void *handle_client(void *arg)
         recv(clienta_socket, buffer, sizeof(buffer),0);
 
         char ack[]="This is an ACK for the given command issued by the client";
-
+        // sleep(6);
         send(clienta_socket,ack,sizeof(ack),0);
 
         pthread_mutex_lock(&mutex);
