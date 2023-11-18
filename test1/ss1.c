@@ -150,29 +150,10 @@ void *handle_connections_client(void*arg)
         }
 
         // Find an available slot in the array
-        pthread_mutex_lock(&mutex);
+        // pthread_mutex_lock(&mutex);
         bzero(buffer,sizeof(buffer));
-
-        // struct ClientInfo *client_info = (struct ClientInfo *)arg;
-        // int client_socket = client_info->client_socket;
-        // char buffer[2048];
-        // int valread;
-
-        // printf("1\n");
-        // Read the data sent by the client
-        // valread = read(new_socket, buffer, sizeof(buffer));
-        
-        // if (valread <= 0) 
-        // {
-        //     printf("done 1\n");
-        //     // Client disconnected or an error occurred
-        // } 
-        
-        // else 
-        // {
             recv(new_socket, buffer, sizeof(buffer),0);
             printf("Command:%s\n",buffer);
-            // Send an acknowledgment back to the client
             char ack[] = "Acknowledgment: Data received";
 
             if(strncmp(buffer,"READ",4)==0)
@@ -214,7 +195,6 @@ void *handle_connections_client(void*arg)
                     fwrite(bet_buf, 1, bytesRead, stdout);
                     send(new_socket,bet_buf,sizeof(bet_buf),0);
                     bzero(bet_buf,sizeof(bet_buf));
-                    // read(new_socket, bet_buf, sizeof(bet_buf));
                     recv(new_socket, bet_buf, sizeof(bet_buf),0);
 
                     if(strcmp(bet_buf,"GOT")!=0)
@@ -231,6 +211,7 @@ void *handle_connections_client(void*arg)
 
             else if(strncmp(buffer,"WRITE",5)==0)
             {
+                pthread_mutex_lock(&mutex);
                 char* token;
                 int count = 0;
 
@@ -238,7 +219,6 @@ void *handle_connections_client(void*arg)
 
                 char temp[MAX_CLIENT_PATH_LENGTH];
                 char to_write[MAX_CLIENT_PATH_LENGTH];
-                // char *firstSpace = strchr(buffer, ' ');
                 bzero(temp,sizeof(temp));
                 bzero(to_write,sizeof(to_write));
 
@@ -252,10 +232,6 @@ void *handle_connections_client(void*arg)
                     {
                         strcat(to_write,token);
                         strcat(to_write," ");
-                        // char *secondSpace = strchr(firstSpace + 1, ' ');
-                        // size_t length = strlen(secondSpace + 1);
-                        // strncpy(to_write, secondSpace + 1, length);
-                        // printf("%s\n",to_write);
                     }
 
                     token = strtok(NULL, " ");
@@ -286,7 +262,7 @@ void *handle_connections_client(void*arg)
                 send(new_socket,to_write,sizeof(to_write),0);
                 fclose(file);
                 
-
+                pthread_mutex_unlock(&mutex);
             }
 
             else if(strncmp(buffer,"GETINFO",7)==0)
@@ -333,11 +309,9 @@ void *handle_connections_client(void*arg)
             }
 
 
-        // }
-
         close(new_socket);
 
-        pthread_mutex_unlock(&mutex);
+        // pthread_mutex_unlock(&mutex);
     }
 
 }
@@ -383,39 +357,24 @@ void * handle_connections_server(void* arg)
     char paths[MAX_PATHS][MAX_PATH_LENGTH];
     int num_paths = 0;
 
-
-
-
     // List files in the current directory
-  listFilesRecursive(currentDir, currentDir, paths, &num_paths);
-
-
-    
-   
-
-    // // Send the IP address, SERVER_PORT, and CLIENT_PORT to the server and also send the list of accessible paths
-    // char data[100];
-    // snprintf(data, sizeof(data), "%s %d %d", SERVER_IP, SERVER_PORT, CLIENT_PORT);
-    // send(sock, data, strlen(data), 0);
-    // printf("Data sent to the server: %s\n", data);
-
-
+    listFilesRecursive(currentDir, currentDir, paths, &num_paths);
 
     // Create a buffer to hold the data to be sent
-char data[4096]; // Adjust the size as needed
+    char data[4096]; // Adjust the size as needed
 
-// Format the data string with SERVER_IP, SERVER_PORT, CLIENT_PORT, and paths
-snprintf(data, sizeof(data), "%s %d %d %d ", SERVER_IP, SERVER_PORT, CLIENT_PORT, num_paths);
+    // Format the data string with SERVER_IP, SERVER_PORT, CLIENT_PORT, and paths
+    snprintf(data, sizeof(data), "%s %d %d %d ", SERVER_IP, SERVER_PORT, CLIENT_PORT, num_paths);
 
-// Append the paths to the data string
-for (int i = 0; i < num_paths; ++i) {
-    strncat(data, paths[i], sizeof(data) - strlen(data) - 1);
-    strncat(data, " ", sizeof(data) - strlen(data) - 1);
-}
+    // Append the paths to the data string
+    for (int i = 0; i < num_paths; ++i) {
+        strncat(data, paths[i], sizeof(data) - strlen(data) - 1);
+        strncat(data, " ", sizeof(data) - strlen(data) - 1);
+    }
 
-// Send the data to the server
-send(sock, data, sizeof(data), 0);
-printf("Data sent to the server: %s\n", data);
+    // Send the data to the server
+    send(sock, data, sizeof(data), 0);
+    printf("Data sent to the server: %s\n", data);
 
     // Receive the server's response
     recv(sock, buffer, sizeof(buffer),0);
@@ -464,25 +423,24 @@ printf("Data sent to the server: %s\n", data);
                 removeDirectoryRecursively(temp1);
             }
 
-            // struct stat file_stat;
+           
+           for (int i = 0; i < num_paths; i++) {
+        if (strcmp(paths[i], temp1) == 0) {
+        // Path found, remove it from paths
+        
 
-            // if (stat(temp1, &file_stat) == 0) 
-            // {
-            //     if (S_ISREG(file_stat.st_mode)) 
-            //     {
-            //         remove(temp1);
-            //     } 
-                
-            //     else if (S_ISDIR(file_stat.st_mode)) 
-            //     {
-            //         rmdir(temp1);
-            //     } 
-            // } 
+        // Shift the remaining elements in the array to fill the gap
+        for (int j = i; j < num_paths - 1; j++) {
+            strcpy(paths[j], paths[j + 1]);
+        }
 
-            // else 
-            // {
-            //     perror("Error getting file/directory information");
-            // }
+        // Decrease the number of paths in the array
+        num_paths--;
+
+        break;
+      }
+   }
+
 
             char ack[1024];
             strcpy(ack,"STOP");
@@ -536,82 +494,6 @@ printf("Data sent to the server: %s\n", data);
 
 int main() 
 {
-//     struct sockaddr_in serv_addr;
-//     char buffer[1024] = {0};
-
-//     // Create socket
-//     if ((sock = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
-//         perror("Socket creation failed");
-//         exit(EXIT_FAILURE);
-//     }
-
-//     serv_addr.sin_family = AF_INET;
-//     serv_addr.sin_port = htons(SERVER_PORT);
-
-//     // Convert IP address from string to binary form
-//     if (inet_pton(AF_INET, SERVER_IP, &serv_addr.sin_addr) <= 0) {
-//         perror("Invalid address/ Address not supported");
-//         exit(EXIT_FAILURE);
-//     }
-
-//     // Connect to the server
-//     if (connect(sock, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0) {
-//         perror("Connection failed");
-//         exit(EXIT_FAILURE);
-//     }
-
-    
-
-//      char currentDir[1024];
-//     if (getcwd(currentDir, sizeof(currentDir)) == NULL) {
-//         perror("getcwd");
-//         exit(EXIT_FAILURE);
-//     }
-
-
-    
-//      // Create an array to store paths
-//     char paths[MAX_PATHS][MAX_PATH_LENGTH];
-//     int num_paths = 0;
-
-
-
-
-//     // List files in the current directory
-//   listFilesRecursive(currentDir, currentDir, paths, &num_paths);
-
-
-    
-   
-
-//     // // Send the IP address, SERVER_PORT, and CLIENT_PORT to the server and also send the list of accessible paths
-//     // char data[100];
-//     // snprintf(data, sizeof(data), "%s %d %d", SERVER_IP, SERVER_PORT, CLIENT_PORT);
-//     // send(sock, data, strlen(data), 0);
-//     // printf("Data sent to the server: %s\n", data);
-
-
-
-//     // Create a buffer to hold the data to be sent
-// char data[4096]; // Adjust the size as needed
-
-// // Format the data string with SERVER_IP, SERVER_PORT, CLIENT_PORT, and paths
-// snprintf(data, sizeof(data), "%s %d %d %d ", SERVER_IP, SERVER_PORT, CLIENT_PORT, num_paths);
-
-// // Append the paths to the data string
-// for (int i = 0; i < num_paths; ++i) {
-//     strncat(data, paths[i], sizeof(data) - strlen(data) - 1);
-//     strncat(data, " ", sizeof(data) - strlen(data) - 1);
-// }
-
-// // Send the data to the server
-// send(sock, data, sizeof(data), 0);
-// printf("Data sent to the server: %s\n", data);
-
-//     // Receive the server's response
-//     recv(sock, buffer, sizeof(buffer),0);
-//     printf("Server response: %s\n", buffer);
-//     printf("Socket: %d\n",sock);
  pthread_t server_thread, client_thread;
 
     // Create a thread for handling server connections
