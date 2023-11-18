@@ -15,7 +15,7 @@ int client_to_nm_port=5566;
 #define MAX_SS_PATHS 128
 #define MAX_SS_PATH_LENGTH 1024
 int num_ss=0;
-int num_client=0;
+int num_clients=0;
 #define MAX_CLIENTS 5
 
 // Define a structure to store client data
@@ -34,14 +34,23 @@ struct Client_Info{
      
 };
 
-struct Client_Info client_arr[MAX_CLIENTS];
-struct SS_Info ss_arr[MAX_SS];
+// struct Client_Info client_arr[MAX_CLIENTS];
+// struct SS_Info ss_arr[MAX_SS];
+
+
+struct SS_Info *ss_arr = NULL;
+struct Client_Info *client_arr = NULL;
+
 pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 
 void *handle_connections_ss(void *arg);
 void *handle_ss(void *arg);
 void *handle_client(void *arg);
 void *handle_connections_client(void*arg);
+void addClient(int client_socket);
+void addSS(int ss_socket);
+
+
 
 void removeLastSlash(char *path) {
     // Find the last occurrence of '/'
@@ -51,6 +60,44 @@ void removeLastSlash(char *path) {
         // Null-terminate the string at the last slash
         *lastSlash = '\0';
     }
+}
+
+
+void addSS(int ss_socket) {
+    // Allocate memory for a new SS_Info struct
+    ss_arr = realloc(ss_arr, (num_ss + 1) * sizeof(struct SS_Info));
+
+    // Check if memory allocation was successful
+    if (ss_arr == NULL) {
+        perror("Memory allocation failed");
+        exit(EXIT_FAILURE);
+    }
+
+    // Initialize the new SS_Info struct
+    struct SS_Info *new_ss = &ss_arr[num_ss];
+    new_ss->ss_socket = ss_socket;
+   
+    // Increment the number of SS in the system
+    num_ss++;
+}
+
+// Function to add a new client to the system
+void addClient(int client_socket) {
+    // Allocate memory for a new Client_Info struct
+    client_arr = realloc(client_arr, (num_clients + 1) * sizeof(struct Client_Info));
+
+    // Check if memory allocation was successful
+    if (client_arr == NULL) {
+        perror("Memory allocation failed");
+        exit(EXIT_FAILURE);
+    }
+
+    // Initialize the new Client_Info struct
+    struct Client_Info *new_client = &client_arr[num_clients];
+    new_client->client_socket = client_socket;
+
+    // Increment the number of clients in the system
+    num_clients++;
 }
 
 // void search(){
@@ -120,22 +167,30 @@ void *handle_connections_ss(void *arg) {
         // Find an available slot in the array
         pthread_mutex_lock(&mutex);
 
-        int i;
-        for (i = 0; i < MAX_SS; i++) {
-            if (ss_arr[i].ss_socket == 0) 
-            {
-                num_ss=i+1;
-                ss_arr[i].ss_socket = new_socket;
+        // int i;
+        // for (i = 0; i < MAX_SS; i++) {
+        //     if (ss_arr[i].ss_socket == 0) 
+        //     {
+        //         num_ss=i+1;
+        //         ss_arr[i].ss_socket = new_socket;
 
-                // Create a thread to handle the new connection
-                pthread_t thread;
-                if (pthread_create(&thread, NULL, handle_ss, (void *)&ss_arr[i]) < 0) {
+        //         // Create a thread to handle the new connection
+        //         pthread_t thread;
+        //         if (pthread_create(&thread, NULL, handle_ss, (void *)&ss_arr[i]) < 0) {
+        //             perror("Thread creation failed");
+        //             exit(EXIT_FAILURE);
+        //         }
+        //         break;
+        //     }
+        // }
+
+        addSS(new_socket);
+         pthread_t thread;
+                if (pthread_create(&thread, NULL, handle_ss, (void *)&ss_arr[num_ss-1]) < 0) {
                     perror("Thread creation failed");
                     exit(EXIT_FAILURE);
                 }
-                break;
-            }
-        }
+
 
         pthread_mutex_unlock(&mutex);
     }
@@ -248,23 +303,28 @@ void*handle_connections_client(void*arg)
         // Find an available slot in the array
         pthread_mutex_lock(&mutex);
 
-        int i;
-        for (i = 0; i < MAX_CLIENTS; i++) {
-            if (client_arr[i].client_socket == 0) 
-            {
-                num_client=i+1;
-                client_arr[i].client_socket = new_socket;
+        // int i;
+        // for (i = 0; i < MAX_CLIENTS; i++) {
+        //     if (client_arr[i].client_socket == 0) 
+        //     {
+        //         num_client=i+1;
+        //         client_arr[i].client_socket = new_socket;
 
-                // Create a thread to handle the new connection
-                pthread_t thread;
-                if (pthread_create(&thread, NULL, handle_client, (void *)&client_arr[i]) < 0) {
+        //         // Create a thread to handle the new connection
+        //         pthread_t thread;
+        //         if (pthread_create(&thread, NULL, handle_client, (void *)&client_arr[i]) < 0) {
+        //             perror("Thread creation failed");
+        //             exit(EXIT_FAILURE);
+        //         }
+        //         break;
+        //     }
+        // }
+        addClient(new_socket);
+        pthread_t thread;
+                   if (pthread_create(&thread, NULL, handle_client, (void *)&client_arr[num_clients-1]) < 0) {
                     perror("Thread creation failed");
                     exit(EXIT_FAILURE);
                 }
-                break;
-            }
-        }
-
         pthread_mutex_unlock(&mutex);
     }
 
