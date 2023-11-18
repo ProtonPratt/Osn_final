@@ -9,29 +9,40 @@
 
 // #define SERVER_PORT 8080
 // #define CLIENT_PORT 5566
-int ss_to_nm_port=8080;
-int client_to_nm_port=5566;
+int ss_to_nm_port = 8080;
+int client_to_nm_port = 5566;
 #define MAX_SS 5
 #define MAX_SS_PATHS 128
 #define MAX_SS_PATH_LENGTH 1024
-int num_ss=0;
-int num_client=0;
+int num_ss = 0;
+int num_client = 0;
 #define MAX_CLIENTS 5
 
+typedef struct DirectoryNode
+{
+    char *name;
+    struct DirectoryNode *parent;
+    struct DirectoryNode **children;
+    size_t numChildren;
+    size_t capacity;
+} DirectoryNode;
+
 // Define a structure to store client data
-struct SS_Info {
+struct SS_Info
+{
     int ss_socket;
-    char ss_ip[16];  // Store IP address as a string
+    char ss_ip[16]; // Store IP address as a string
     int server_port;
     int ss_port;
     int id;
-     int num_paths;
-     char paths[MAX_SS_PATHS][MAX_SS_PATH_LENGTH];
+    int num_paths;
+    //  char paths[MAX_SS_PATHS][MAX_SS_PATH_LENGTH];
+    DirectoryNode *trie_root;
 };
 
-struct Client_Info{
-     int client_socket;
-     
+struct Client_Info
+{
+    int client_socket;
 };
 
 struct Client_Info client_arr[MAX_CLIENTS];
@@ -41,33 +52,42 @@ pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 void *handle_connections_ss(void *arg);
 void *handle_ss(void *arg);
 void *handle_client(void *arg);
-void *handle_connections_client(void*arg);
+void *handle_connections_client(void *arg);
+void addChildToDirectoryNode(DirectoryNode *parent, DirectoryNode *child);
+void addPathToTree(DirectoryNode *root, const char *path);
+void freeDirectoryNode(DirectoryNode *node);
+void printDirectoryStructure(DirectoryNode *root, int level);
+DirectoryNode *createDirectoryNode(const char *name, DirectoryNode *parent);
+DirectoryNode *findOrCreateChild(DirectoryNode *parent, const char *childName);
+DirectoryNode *searchPathInTree(DirectoryNode *root, const char *path);
+void deletePathFromTree(DirectoryNode* root, const char* path, DirectoryNode* orignal_temp);
 
-void removeLastSlash(char *path) {
+void removeLastSlash(char *path)
+{
     // Find the last occurrence of '/'
     char *lastSlash = strrchr(path, '/');
 
-    if (lastSlash != NULL) {
+    if (lastSlash != NULL)
+    {
         // Null-terminate the string at the last slash
         *lastSlash = '\0';
     }
 }
 
-// void search(){
-    
-// }
-
-int main() {
+int main()
+{
     pthread_t server_thread, client_thread;
 
     // Create a thread for handling server connections
-    if (pthread_create(&server_thread, NULL, handle_connections_ss, (void *)&ss_to_nm_port) < 0) {
+    if (pthread_create(&server_thread, NULL, handle_connections_ss, (void *)&ss_to_nm_port) < 0)
+    {
         perror("Server thread creation failed");
         exit(EXIT_FAILURE);
     }
 
     // Create a thread for handling client connections
-    if (pthread_create(&client_thread, NULL, handle_connections_client, (void *)&client_to_nm_port) < 0) {
+    if (pthread_create(&client_thread, NULL, handle_connections_client, (void *)&client_to_nm_port) < 0)
+    {
         perror("Client thread creation failed");
         exit(EXIT_FAILURE);
     }
@@ -79,7 +99,8 @@ int main() {
     return 0;
 }
 
-void *handle_connections_ss(void *arg) {
+void *handle_connections_ss(void *arg)
+{
     int port = *((int *)arg);
 
     int server_fd, new_socket;
@@ -87,7 +108,8 @@ void *handle_connections_ss(void *arg) {
     int addrlen = sizeof(address);
 
     // Create socket
-    if ((server_fd = socket(AF_INET, SOCK_STREAM, 0)) == 0) {
+    if ((server_fd = socket(AF_INET, SOCK_STREAM, 0)) == 0)
+    {
         perror("Socket creation failed");
         exit(EXIT_FAILURE);
     }
@@ -97,22 +119,26 @@ void *handle_connections_ss(void *arg) {
     address.sin_port = htons(port);
 
     // Bind the socket
-    if (bind(server_fd, (struct sockaddr *)&address, sizeof(address)) < 0) {
+    if (bind(server_fd, (struct sockaddr *)&address, sizeof(address)) < 0)
+    {
         perror("Bind failed");
         exit(EXIT_FAILURE);
     }
 
     // Listen for incoming connections
-    if (listen(server_fd, MAX_SS) < 0) {
+    if (listen(server_fd, MAX_SS) < 0)
+    {
         perror("Listen failed");
         exit(EXIT_FAILURE);
     }
 
     printf("Server listening on port %d...\n", port);
 
-    while (1) {
+    while (1)
+    {
         // Accept a new connection
-        if ((new_socket = accept(server_fd, (struct sockaddr *)&address, (socklen_t *)&addrlen)) < 0) {
+        if ((new_socket = accept(server_fd, (struct sockaddr *)&address, (socklen_t *)&addrlen)) < 0)
+        {
             perror("Accept failed");
             exit(EXIT_FAILURE);
         }
@@ -121,15 +147,17 @@ void *handle_connections_ss(void *arg) {
         pthread_mutex_lock(&mutex);
 
         int i;
-        for (i = 0; i < MAX_SS; i++) {
-            if (ss_arr[i].ss_socket == 0) 
+        for (i = 0; i < MAX_SS; i++)
+        {
+            if (ss_arr[i].ss_socket == 0)
             {
-                num_ss=i+1;
+                num_ss = i + 1;
                 ss_arr[i].ss_socket = new_socket;
 
                 // Create a thread to handle the new connection
                 pthread_t thread;
-                if (pthread_create(&thread, NULL, handle_ss, (void *)&ss_arr[i]) < 0) {
+                if (pthread_create(&thread, NULL, handle_ss, (void *)&ss_arr[i]) < 0)
+                {
                     perror("Thread creation failed");
                     exit(EXIT_FAILURE);
                 }
@@ -141,7 +169,7 @@ void *handle_connections_ss(void *arg) {
     }
 }
 
-void *handle_ss(void *arg) 
+void *handle_ss(void *arg)
 {
     struct SS_Info *ss_info = (struct SS_Info *)arg;
     int ss_socket = ss_info->ss_socket;
@@ -154,47 +182,61 @@ void *handle_ss(void *arg)
     //     // Client disconnected or an error occurred
     //     close(client_socket);
     // } else {
-        recv(ss_socket, buffer, sizeof(buffer),0);
-        char *token;
-        int count = 0;
+    recv(ss_socket, buffer, sizeof(buffer), 0);
+    char *token;
+    int count = 0;
 
-        token = strtok(buffer, " ");
+    token = strtok(buffer, " ");
 
-        while (token != NULL) {
-            if (count == 0) {
-                strcpy(ss_info->ss_ip, token);
-            } else if (count == 1) {
-                ss_info->server_port = atoi(token);
-            } else if (count == 2) {
-                ss_info->ss_port = atoi(token);
-                ss_info->id = ss_info->ss_port - ss_info->server_port;
-            } else if (count == 3) {
-                ss_info->num_paths = atoi(token);
-            } else if (count >= 4 && count < 4 + ss_info->num_paths) {
-                // Copy paths into the ClientInfo structure
-                strcpy(ss_info->paths[count - 4], token);
-            }
-            token = strtok(NULL, " ");
-            count++;
+    while (token != NULL)
+    {
+        if (count == 0)
+        {
+            strcpy(ss_info->ss_ip, token);
         }
-
-        printf("Client Info:\n");
-        printf("Socket: %d\n",ss_info->ss_socket);
-        printf("IP: %s\n", ss_info->ss_ip);
-        printf("Server Port: %d\n", ss_info->server_port);
-        printf("Client Port: %d\n", ss_info->ss_port);
-        printf("ID: %d\n", ss_info->id);
-        printf("Number of Paths: %d\n", ss_info->num_paths);
-        printf("Paths:\n");
-        for (int i = 0; i < ss_info->num_paths; ++i) {
-            printf("%s\n", ss_info->paths[i]);
+        else if (count == 1)
+        {
+            ss_info->server_port = atoi(token);
         }
+        else if (count == 2)
+        {
+            ss_info->ss_port = atoi(token);
+            ss_info->id = ss_info->ss_port - ss_info->server_port;
+        }
+        else if (count == 3)
+        {
+            ss_info->num_paths = atoi(token);
+        }
+        else if (count >= 4 && count < 4 + ss_info->num_paths)
+        {
+            // Copy paths into the ClientInfo structure
+            // strcpy(ss_info->paths[count - 4], token);
 
-        // Send an acknowledgment back to the client
-        char ack[1024];
-        strcpy(ack,"Acknowledgment: Data received");
-        printf("Client: %d\n",ss_socket);
-        send(ss_socket, ack, sizeof(ack),0);
+            addPathToTree(ss_info->trie_root, token);
+        }
+        token = strtok(NULL, " ");
+        count++;
+    }
+
+    printf("Client Info:\n");
+    printf("Socket: %d\n", ss_info->ss_socket);
+    printf("IP: %s\n", ss_info->ss_ip);
+    printf("Server Port: %d\n", ss_info->server_port);
+    printf("Client Port: %d\n", ss_info->ss_port);
+    printf("ID: %d\n", ss_info->id);
+    printf("Number of Paths: %d\n", ss_info->num_paths);
+    printf("Paths:\n");
+    // for (int i = 0; i < ss_info->num_paths; ++i) {
+    //     printf("%s\n", ss_info->paths[i]);
+    // }
+
+    printDirectoryStructure(ss_info->trie_root, 0);
+
+    // Send an acknowledgment back to the client
+    char ack[1024];
+    strcpy(ack, "Acknowledgment: Data received");
+    printf("Client: %d\n", ss_socket);
+    send(ss_socket, ack, sizeof(ack), 0);
 
     // }
 
@@ -205,42 +247,44 @@ void *handle_ss(void *arg)
     pthread_exit(NULL);
 }
 
-
-void*handle_connections_client(void*arg)
+void *handle_connections_client(void *arg)
 {
-    int port=*((int *)arg);
-
+    int port = *((int *)arg);
 
     int server_fd, new_socket;
     struct sockaddr_in address;
     int addrlen = sizeof(address);
 
     // Create socket
-    if ((server_fd = socket(AF_INET, SOCK_STREAM, 0)) == 0) {
+    if ((server_fd = socket(AF_INET, SOCK_STREAM, 0)) == 0)
+    {
         perror("Socket creation failed");
         exit(EXIT_FAILURE);
     }
 
-     address.sin_family = AF_INET;
+    address.sin_family = AF_INET;
     address.sin_addr.s_addr = INADDR_ANY;
     address.sin_port = htons(port);
-   
-   // Bind the socket
-    if (bind(server_fd, (struct sockaddr *)&address, sizeof(address)) < 0) {
+
+    // Bind the socket
+    if (bind(server_fd, (struct sockaddr *)&address, sizeof(address)) < 0)
+    {
         perror("Bind failed");
         exit(EXIT_FAILURE);
     }
- 
 
-  // Listen for incoming connections
-    if (listen(server_fd, MAX_CLIENTS) < 0) {
+    // Listen for incoming connections
+    if (listen(server_fd, MAX_CLIENTS) < 0)
+    {
         perror("Listen failed");
         exit(EXIT_FAILURE);
     }
 
-     while (1) {
+    while (1)
+    {
         // Accept a new connection
-        if ((new_socket = accept(server_fd, (struct sockaddr *)&address, (socklen_t *)&addrlen)) < 0) {
+        if ((new_socket = accept(server_fd, (struct sockaddr *)&address, (socklen_t *)&addrlen)) < 0)
+        {
             perror("Accept failed");
             exit(EXIT_FAILURE);
         }
@@ -249,15 +293,17 @@ void*handle_connections_client(void*arg)
         pthread_mutex_lock(&mutex);
 
         int i;
-        for (i = 0; i < MAX_CLIENTS; i++) {
-            if (client_arr[i].client_socket == 0) 
+        for (i = 0; i < MAX_CLIENTS; i++)
+        {
+            if (client_arr[i].client_socket == 0)
             {
-                num_client=i+1;
+                num_client = i + 1;
                 client_arr[i].client_socket = new_socket;
 
                 // Create a thread to handle the new connection
                 pthread_t thread;
-                if (pthread_create(&thread, NULL, handle_client, (void *)&client_arr[i]) < 0) {
+                if (pthread_create(&thread, NULL, handle_client, (void *)&client_arr[i]) < 0)
+                {
                     perror("Thread creation failed");
                     exit(EXIT_FAILURE);
                 }
@@ -267,18 +313,7 @@ void*handle_connections_client(void*arg)
 
         pthread_mutex_unlock(&mutex);
     }
-
-
-    
-
-
-
 }
-
-
-
-
-
 
 void *handle_client(void *arg)
 {
@@ -312,169 +347,218 @@ void *handle_client(void *arg)
 
     // printf("Server listening on port %d for client...\n", port);
 
-    // if ((new_socket = accept(server_fd, (struct sockaddr *)&address, (socklen_t *)&addrlen)) < 0) 
+    // if ((new_socket = accept(server_fd, (struct sockaddr *)&address, (socklen_t *)&addrlen)) < 0)
     // {
     //         perror("Accept failed");
     //         exit(EXIT_FAILURE);
     // }
 
-  struct Client_Info *client_info = (struct Client_Info *)arg;
+    struct Client_Info *client_info = (struct Client_Info *)arg;
     int clienta_socket = client_info->client_socket;
-    
-
-
 
     char buffer[1024];
     char data[4096];
-    while (1) 
+    while (1)
     {
-        bzero(buffer,sizeof(buffer));
+        bzero(buffer, sizeof(buffer));
 
-        recv(clienta_socket, buffer, sizeof(buffer),0);
+        recv(clienta_socket, buffer, sizeof(buffer), 0);
 
         pthread_mutex_lock(&mutex);
-            
-            if(strncmp(buffer,"READ",4)==0 || strncmp(buffer,"WRITE",5)==0 || strncmp(buffer,"GETINFO",7)==0)
+
+        if (strncmp(buffer, "READ", 4) == 0 || strncmp(buffer, "WRITE", 5) == 0 || strncmp(buffer, "GETINFO", 7) == 0)
+        {
+            char *token;
+            int count = 0;
+
+            token = strtok(buffer, " ");
+            char temp[MAX_SS_PATH_LENGTH]; // temp relative path
+            char ip_temp[1024];
+            int temp_port;
+
+            while (token != NULL)
             {
-                char *token;
-                int count = 0;
-
-                token = strtok(buffer, " ");
-                char temp[MAX_SS_PATH_LENGTH]; // temp relative path
-                char ip_temp[1024];
-                int temp_port;
-
-                while(token!=NULL)
+                if (count == 1)
                 {
-                    if(count==1)
-                    {
-                        strcpy(temp,token);
-                    }
-
-                    token = strtok(NULL, " ");
-                    count++;
+                    strcpy(temp, token);
                 }
+
+                token = strtok(NULL, " ");
+                count++;
+            }
+
+            // search
+            // for(int i=0;i<num_ss;i++)
+            // {
+            //     for(int j=0;j<ss_arr[i].num_paths;j++)
+            //     {
+            //         if(strcmp(ss_arr[i].paths[j],temp)==0)
+            //         {
+            //             strcpy(ip_temp,ss_arr[i].ss_ip);
+            //             temp_port=ss_arr[i].ss_port;
+            //             break;
+            //         }
+            //     }
+            // }
+
+            // efficient search
+
+            for (int i = 0; i < num_ss; i++)
+            {
+
+                // if found the server it copies the ip into iptemp and
+                // client_port into temp_port
+                if (searchPathInTree(ss_arr[i].trie_root, temp) != NULL)
+                {
+                    strcpy(ip_temp, ss_arr[i].ss_ip);
+                    temp_port = ss_arr[i].ss_port;
+                    break;
+                }
+            }
+
+            bzero(data, sizeof(data));
+            printf("Port: %d\n", temp_port);
+            snprintf(data, sizeof(data), "%s %d", ip_temp, temp_port);
+            printf("Sent Data: %s\n", data);
+            send(clienta_socket, data, sizeof(data), 0);
+        }
+        else if (strncmp(buffer, "CREATE", 6) == 0 || strncmp(buffer, "DELETE", 6) == 0)
+        {
+            char *token;
+            int count = 0;
+            char buffer1[2048];
+            strcpy(buffer1, buffer);
+
+            token = strtok(buffer, " ");
+            char temp[MAX_SS_PATH_LENGTH];
+            int temp_socket;
+
+            while (token != NULL)
+            {
+                if (count == 1)
+                {
+                    strcpy(temp, token);
+                }
+
+                token = strtok(NULL, " ");
+                count++;
+            }
+
+            if (strncmp(buffer, "DELETE", 6) == 0)
+            {
+                // search
+
+                // for(int i=0;i<num_ss;i++)
+                // {
+                //     for(int j=0;j<ss_arr[i].num_paths;j++)
+                //     {
+                //         if(strcmp(ss_arr[i].paths[j],temp)==0)
+                //         {
+                //             // printf("Temp Socket: %d\n",temp_socket);
+                //             temp_socket=ss_arr[i].ss_socket;
+                //             printf("Temp Socket: %d\n",temp_socket);
+                //             break;
+                //         }
+                //     }
+                // }
+
+                // delete
+
+                // for (int i = 0; i < num_ss; i++)
+                // {
+                //     for (int j = 0; j < ss_arr[i].num_paths; j++)
+                //     {
+                //         if (strcmp(ss_arr[i].paths[j], temp) == 0)
+                //         {
+                //             // Path found, remove it from ss_arr
+                //             temp_socket = ss_arr[i].ss_socket;
+                //             printf("Temp Socket: %d\n", temp_socket);
+
+                //             // Shift the remaining elements in the array to fill the gap
+                //             for (int k = j; k < ss_arr[i].num_paths - 1; k++)
+                //             {
+                //                 strcpy(ss_arr[i].paths[k], ss_arr[i].paths[k + 1]);
+                //             }
+
+                //             // Decrease the number of paths in the array
+                //             ss_arr[i].num_paths--;
+
+                //             break;
+                //         }
+                //     }
+                // }
+
+                // efficient search
+
+                for(int i=0;i<num_ss;i++)
+                {   
+                    // node_delete is the node and its children to be murdered
+                    DirectoryNode* node_delete=searchPathInTree(ss_arr[i].trie_root,temp);
+                    if(node_delete!=NULL)
+                    {
+                        deletePathFromTree(ss_arr[i].trie_root,NULL,node_delete); // here path is given as NULL as the node is searched by node_delete
+                        break;
+                    }
+                    
+                }
+
+                // printf("Buffer: %s\n",buffer);
+                send(temp_socket, buffer1, sizeof(buffer1), 0);
+                printf("Send\n");
+                bzero(buffer1, sizeof(buffer1));
+                recv(temp_socket, buffer1, sizeof(buffer1), 0);
+                send(clienta_socket, buffer1, sizeof(buffer1), 0);
+            }
+
+            else if (strncmp(buffer, "CREATE", 6) == 0)
+            {
+                char orignal_path[MAX_SS_PATH_LENGTH];
+                strcpy(orignal_path, temp);
+                removeLastSlash(temp);
 
                 // search
+                // for (int i = 0; i < num_ss; i++)
+                // {
+                //     for (int j = 0; j < ss_arr[i].num_paths; j++)
+                //     {
+                //         // printf("Comp1: %s Comp2: %s\n",temp_path1,temp);
+
+                //         if (strcmp(ss_arr[i].paths[j], temp) == 0)
+                //         {
+                //             temp_socket = ss_arr[i].ss_socket;
+                //             printf("Temp Socket: %d\n", temp_socket);
+                //             strcpy(ss_arr[i].paths[ss_arr[i].num_paths], orignal_path);
+                //             ss_arr[i].num_paths++;
+                //             break;
+                //         }
+                //     }
+                // }
+
+                // efficient search
+
                 for(int i=0;i<num_ss;i++)
                 {
-                    for(int j=0;j<ss_arr[i].num_paths;j++)
+                    // if found the server it copies the ip into iptemp and
+                    // client_port into temp_port
+                    if(searchPathInTree(ss_arr[i].trie_root,temp)!=NULL)
                     {
-                        if(strcmp(ss_arr[i].paths[j],temp)==0)
-                        {
-                            strcpy(ip_temp,ss_arr[i].ss_ip);
-                            temp_port=ss_arr[i].ss_port;
-                            break;
-                        }
+                        temp_socket = ss_arr[i].ss_socket;
+                        printf("Temp Socket: %d\n", temp_socket);
+                        // add new path
+                        // strcpy(ss_arr[i].paths[ss_arr[i].num_paths], orignal_path);
+                        // ss_arr[i].num_paths++;
+                        addPathToTree(ss_arr[i].trie_root,orignal_path);
+                        break;
                     }
                 }
 
-                bzero(data,sizeof(data));
-                printf("Port: %d\n",temp_port);
-                snprintf(data, sizeof(data), "%s %d", ip_temp, temp_port);
-                printf("Sent Data: %s\n",data);
-                send(clienta_socket, data, sizeof(data), 0);
+                send(temp_socket, buffer1, sizeof(buffer1), 0);
+                printf("Send\n");
+                bzero(buffer1, sizeof(buffer1));
+                recv(temp_socket, buffer1, sizeof(buffer1), 0);
+                send(clienta_socket, buffer1, sizeof(buffer1), 0);
             }
-            else if(strncmp(buffer,"CREATE",6)==0 || strncmp(buffer,"DELETE",6)==0)
-            {
-                char *token;
-                int count = 0;
-                char buffer1[2048];
-                strcpy(buffer1,buffer);
-
-                token = strtok(buffer, " ");
-                char temp[MAX_SS_PATH_LENGTH];
-                int temp_socket;
-
-                while(token!=NULL)
-                {
-                    if(count==1)
-                    {
-                        strcpy(temp,token);
-                    }
-
-                    token = strtok(NULL, " ");
-                    count++;
-                }
-
-                if(strncmp(buffer,"DELETE",6)==0)
-                {
-                    // search
-                    // for(int i=0;i<num_ss;i++)
-                    // {
-                    //     for(int j=0;j<ss_arr[i].num_paths;j++)
-                    //     {
-                    //         if(strcmp(ss_arr[i].paths[j],temp)==0)
-                    //         {   
-                    //             // printf("Temp Socket: %d\n",temp_socket);
-                    //             temp_socket=ss_arr[i].ss_socket;
-                    //             printf("Temp Socket: %d\n",temp_socket);
-                    //             break;
-                    //         }
-                    //     }
-                    // }
-
-
-
-                          for (int i = 0; i < num_ss; i++) {
-                              for (int j = 0; j < ss_arr[i].num_paths; j++) {
-                                     if (strcmp(ss_arr[i].paths[j], temp) == 0) {
-                                       // Path found, remove it from ss_arr
-                                      temp_socket = ss_arr[i].ss_socket;
-                                      printf("Temp Socket: %d\n", temp_socket);
-
-                                        // Shift the remaining elements in the array to fill the gap
-                        for (int k = j; k < ss_arr[i].num_paths - 1; k++) {
-                         strcpy(ss_arr[i].paths[k], ss_arr[i].paths[k + 1]);
-                          }
-
-            // Decrease the number of paths in the array
-                          ss_arr[i].num_paths--;
-
-                             break;
         }
-    }
-}
-
-                    // printf("Buffer: %s\n",buffer);
-                    send(temp_socket,buffer1,sizeof(buffer1),0);
-                    printf("Send\n");
-                    bzero(buffer1,sizeof(buffer1));
-                    recv(temp_socket,buffer1,sizeof(buffer1),0);
-                    send(clienta_socket, buffer1, sizeof(buffer1),0);
-
-                }
-
-                else if(strncmp(buffer,"CREATE",6)==0)
-                {
-                    char temp1[MAX_SS_PATH_LENGTH];
-                    strcpy(temp1,temp);
-                    
-                    // search
-                    removeLastSlash(temp);
-                    for(int i=0;i<num_ss;i++)
-                    {
-                        for(int j=0;j<ss_arr[i].num_paths;j++)
-                        {
-                            // printf("Comp1: %s Comp2: %s\n",temp_path1,temp);
-
-                            if(strcmp(ss_arr[i].paths[j],temp)==0)
-                            {
-                                temp_socket=ss_arr[i].ss_socket;
-                                printf("Temp Socket: %d\n",temp_socket);
-                                strcpy(ss_arr[i].paths[ss_arr[i].num_paths],temp1);
-                                ss_arr[i].num_paths++;
-                                break;
-                            }
-                        }
-                    }
-                    send(temp_socket,buffer1,sizeof(buffer1),0);
-                    printf("Send\n");
-                    bzero(buffer1,sizeof(buffer1));
-                    recv(temp_socket,buffer1,sizeof(buffer1),0);
-                    send(clienta_socket, buffer1, sizeof(buffer1),0);
-                }
-            }
 
         pthread_mutex_unlock(&mutex);
     }

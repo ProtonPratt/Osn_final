@@ -8,5 +8,5 @@
 
 ### THINGS REMAINING 
 
-1. efficient search
-2. multiple clients
+1. LRU
+2. Redundency and replication
