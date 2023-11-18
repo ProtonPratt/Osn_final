@@ -5,7 +5,7 @@
 #include <arpa/inet.h>
 
 #define SERVER_PORT 5566
-#define MAX_BUFFER_SIZE 1024
+#define MAX_BUFFER_SIZE 4096
 #define SERVER_IP "127.0.0.1"
 #define MAX_CLIENT_PATH_LENGTH 1024
 
@@ -29,7 +29,7 @@ int main()
 {
     int sock = 0, valread;
     struct sockaddr_in serv_addr;
-    char buffer[1024] = {0};
+    char buffer[4096];
 
     // Create socket
     if ((sock = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
@@ -74,13 +74,16 @@ int main()
         {
             // printf("ENtered\n");
             char buffer1[MAX_BUFFER_SIZE];
-            bzero(buffer1,sizeof(buffer1));
+            memset(buffer1 , 0, sizeof(buffer1));
+            // bzero(buffer1,sizeof(buffer1));
             if (recv(sock, buffer1, sizeof(buffer1), 0) == -1) 
-            {
+            {   
                 perror("Receiving data from server failed");
                 close(sock);
                 exit(EXIT_FAILURE);
             }
+            // send(sock, &y, sizeof(y), 0);
+            printf("values: %s\n",buffer1);
 
             char* token;
             int count = 0;
@@ -93,6 +96,7 @@ int main()
                     if(count==1)
                     {
                         temp_port=atoi(token);
+                        printf("Updated: %d\n",temp_port);
                     }
 
                     token = strtok(NULL, " ");
@@ -101,7 +105,6 @@ int main()
 
             int client_sock = 0;
             struct sockaddr_in client_addr;
-
             // Create socket
             if ((client_sock = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
                 perror("Socket creation failed");
