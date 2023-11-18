@@ -33,6 +33,16 @@ void *handle_connections(void *arg);
 void *handle_client(void *arg);
 void *handle_connections_client(void *arg);
 
+void removeLastSlash(char *path) {
+    // Find the last occurrence of '/'
+    char *lastSlash = strrchr(path, '/');
+
+    if (lastSlash != NULL) {
+        // Null-terminate the string at the last slash
+        *lastSlash = '\0';
+    }
+}
+
 int main() {
     pthread_t server_thread, client_thread;
 
@@ -220,6 +230,7 @@ void *handle_connections_client(void *arg)
     }
 
     char buffer[1024];
+    char data[4096];
     while (1) 
     {
         // Accept a new connection
@@ -248,9 +259,9 @@ void *handle_connections_client(void *arg)
 
         // else 
         // {
-            printf("Command:%s\n",buffer);
+            // printf("Command:%s\n",buffer);
             // Send an acknowledgment back to the client
-            char ack[] = "Acknowledgment: Data received";
+            // char ack[] = "Acknowledgment: Data received";
             
             if(strncmp(buffer,"READ",4)==0 || strncmp(buffer,"WRITE",5)==0 || strncmp(buffer,"GETINFO",7)==0)
             {
@@ -287,9 +298,11 @@ void *handle_connections_client(void *arg)
                     }
                 }
 
-                char data[4096];
+                // char data[4096];
+                bzero(data,sizeof(data));
                 printf("Port: %d\n",temp_port);
                 snprintf(data, sizeof(data), "%s %d", ip_temp, temp_port);
+                printf("Sent Data: %s\n",data);
                 send(new_socket, data, sizeof(data), 0);
             }
             else if(strncmp(buffer,"CREATE",6)==0 || strncmp(buffer,"DELETE",6)==0)
@@ -336,29 +349,34 @@ void *handle_connections_client(void *arg)
                     recv(temp_socket,buffer1,sizeof(buffer1),0);
                     send(new_socket, buffer1, sizeof(buffer1),0);
 
-                    // struct sockaddr_in serv_addr;
-                    
-                    // // Create socket
-                    // if ((sock = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
-                    //     perror("Socket creation failed");
-                    //     exit(EXIT_FAILURE);
-                    // }
+                }
 
-                    // serv_addr.sin_family = AF_INET;
-                    // serv_addr.sin_port = htons(SERVER_PORT);
+                else if(strncmp(buffer,"CREATE",6)==0)
+                {
+                    char temp1[MAX_CLIENT_PATH_LENGTH];
+                    strcpy(temp1,temp);
+                    removeLastSlash(temp);
+                    for(int i=0;i<num_ss;i++)
+                    {
+                        for(int j=0;j<clients[i].num_paths;j++)
+                        {
+                            // printf("Comp1: %s Comp2: %s\n",temp_path1,temp);
 
-                    // // Convert IP address from string to binary form
-                    // if (inet_pton(AF_INET, SERVER_IP, &serv_addr.sin_addr) <= 0) {
-                    //     perror("Invalid address/ Address not supported");
-                    //     exit(EXIT_FAILURE);
-                    // }
-
-                    // // Connect to the server
-                    // if (connect(sock, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0) {
-                    //     perror("Connection failed");
-                    //     exit(EXIT_FAILURE);
-                    // }
-
+                            if(strcmp(clients[i].paths[j],temp)==0)
+                            {
+                                temp_socket=clients[i].client_socket;
+                                printf("Temp Socket: %d\n",temp_socket);
+                                strcpy(clients[i].paths[clients[i].num_paths],temp1);
+                                clients[i].num_paths++;
+                                break;
+                            }
+                        }
+                    }
+                    send(temp_socket,buffer1,sizeof(buffer1),0);
+                    printf("Send\n");
+                    bzero(buffer1,sizeof(buffer1));
+                    recv(temp_socket,buffer1,sizeof(buffer1),0);
+                    send(new_socket, buffer1, sizeof(buffer1),0);
                 }
             }
         // }
