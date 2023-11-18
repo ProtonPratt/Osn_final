@@ -3,6 +3,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <arpa/inet.h>
+#include <sys/select.h>
 
 #define SERVER_PORT 5566
 #define MAX_BUFFER_SIZE 4096
@@ -68,6 +69,32 @@ int main()
             perror("Sending data to server failed");
             break;
         }
+
+
+           // Set up timeout variables
+        fd_set readfds;
+        struct timeval timeout;
+        timeout.tv_sec = 5;  // 5 seconds timeout
+
+        // Wait for data to be ready to read with timeout
+        FD_ZERO(&readfds);
+        FD_SET(sock, &readfds);
+
+        int activity = select(sock + 1, &readfds, NULL, NULL, &timeout);
+        
+
+        if (activity == 0) {
+            // Timeout occurred
+            printf("Timeout: No response from the server within 5 seconds.\n");
+            close(sock);
+            exit(EXIT_FAILURE);
+        } else if (activity < 0) 
+        {
+            perror("Select error");
+            close(sock);
+            exit(EXIT_FAILURE);
+        }
+
         printf("ENtered\n");
 
         if(strncmp(buffer,"READ",4)==0 || strncmp(buffer,"WRITE",5)==0 || strncmp(buffer,"GETINFO",7)==0)

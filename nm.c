@@ -332,6 +332,10 @@ void *handle_client(void *arg)
 
         recv(clienta_socket, buffer, sizeof(buffer),0);
 
+        char ack[]="This is an ACK for the given command issued by the client";
+
+        send(clienta_socket,ack,sizeof(ack),0);
+
         pthread_mutex_lock(&mutex);
             
             if(strncmp(buffer,"READ",4)==0 || strncmp(buffer,"WRITE",5)==0 || strncmp(buffer,"GETINFO",7)==0)
