@@ -17,43 +17,9 @@
 int server_port=SERVER_PORT;
 int client_port=CLIENT_PORT;
 pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
-#define MAX_CLIENT_PATH_LENGTH 1024
-// int sock=0;
+#define MAX_CLIENT_PATH_LENGTH 4096
+int sock=0;
 
-// void listFilesRecursive(const char *dirPath, const char *basePath, char (*paths)[MAX_PATH_LENGTH], int *count) {
-//     DIR *dir;
-//     struct dirent *entry;
-
-//     // Open the directory
-//     dir = opendir(dirPath);
-//     if (!dir) {
-//         perror("opendir");
-//         exit(EXIT_FAILURE);
-//     }
-
-//     // Loop through each entry in the directory
-//     while ((entry = readdir(dir)) != NULL && *count < MAX_PATHS) {
-//         // Ignore "." and ".." entries
-//         if (strcmp(entry->d_name, ".") != 0 && strcmp(entry->d_name, "..") != 0) {
-//             // Construct full path of the current entry
-//             char path[MAX_PATH_LENGTH];
-//             snprintf(path, sizeof(path), "%s/%s", dirPath, entry->d_name);
-
-//             // Check if the entry is a directory
-//             if (entry->d_type == DT_DIR) {
-//                 // Recursively list files in the subdirectory
-//                 listFilesRecursive(path, basePath, paths, count);
-//             } else {
-//                 // Store the relative path of the file with a forward slash
-//                 // prefixed at the beginning of the relative path
-//                 snprintf(paths[(*count)++], MAX_PATH_LENGTH, "%s", path + strlen(basePath) + 1);
-//             }
-//         }
-//     }
-
-//     // Close the directory
-//     closedir(dir);
-// }
 
 void listFilesRecursive(const char *dirPath, const char *basePath, char (*paths)[MAX_PATH_LENGTH], int *count)
 {
@@ -107,7 +73,7 @@ void removeLastCharacter(char *str) {
     }
 }
 
-void removeDirectoryRecursively(char *path) {
+void removeDirectoryRecursively(const char *path) {
     DIR *dir = opendir(path);
     struct dirent *entry;
 
@@ -282,7 +248,6 @@ void *handle_connections_client(void*arg)
                     {
                         strcpy(temp,token);
                     }
-
                     if(count>=2)
                     {
                         strcat(to_write,token);
@@ -290,12 +255,12 @@ void *handle_connections_client(void*arg)
                         // char *secondSpace = strchr(firstSpace + 1, ' ');
                         // size_t length = strlen(secondSpace + 1);
                         // strncpy(to_write, secondSpace + 1, length);
+                        // printf("%s\n",to_write);
                     }
 
                     token = strtok(NULL, " ");
                     count++;
                 }
-
                 removeLastCharacter(to_write);
 
                 char temp1[MAX_CLIENT_PATH_LENGTH];
@@ -379,10 +344,9 @@ void *handle_connections_client(void*arg)
 
 void * handle_connections_server(void* arg)
 {
-    int port = *((int *)arg);
-    int sock=0;
+    int port=*((int *)arg);
     struct sockaddr_in serv_addr;
-    char buffer[1024] = {0};
+    char buffer[4096];
 
     // Create socket
     if ((sock = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
@@ -391,7 +355,7 @@ void * handle_connections_server(void* arg)
     }
 
     serv_addr.sin_family = AF_INET;
-    serv_addr.sin_port = htons(SERVER_PORT);
+    serv_addr.sin_port = htons(port);
 
     // Convert IP address from string to binary form
     if (inet_pton(AF_INET, SERVER_IP, &serv_addr.sin_addr) <= 0) {
@@ -450,12 +414,13 @@ for (int i = 0; i < num_paths; ++i) {
 }
 
 // Send the data to the server
-    send(sock, data, sizeof(data), 0);
-    printf("Data sent to the server: %s\n", data);
+send(sock, data, sizeof(data), 0);
+printf("Data sent to the server: %s\n", data);
 
     // Receive the server's response
     recv(sock, buffer, sizeof(buffer),0);
     printf("Server response: %s\n", buffer);
+    printf("Socket: %d\n",sock);
 
     while(1)
     {
@@ -524,21 +489,53 @@ for (int i = 0; i < num_paths; ++i) {
 
             send(sock,ack,sizeof(ack),0);
         }
+
+        else if(strncmp(buffer,"CREATE",6)==0)
+        {
+            while(token!=NULL)
+                    {
+                        if(count==1)
+                        {
+                            strcpy(temp,token);
+                        }
+                        if(count==2)
+                        {
+                            strcpy(flag,token);
+                        }
+
+                        token = strtok(NULL, " ");
+                        count++;
+                    }
+            
+            char temp1[MAX_CLIENT_PATH_LENGTH];
+            getcwd(temp1, sizeof(temp1));
+            strcat(temp1,"/");
+            strcat(temp1,temp);
+
+            if(strcmp(flag,"-d")==0)
+            {
+                mkdir(temp1,S_IRWXU);
+            }
+            
+            else if(strcmp(flag,"-f")==0)
+            {
+                FILE* file=fopen(temp1,"w");
+                fclose(file);
+            }
+
+            char ack[1024];
+            strcpy(ack,"STOP");
+
+            send(sock,ack,sizeof(ack),0);
+        }
     }
 
-    // printf("Sock: %d\n",sock);
-
-    // char buffer1[2048];
-    // bzero(buffer1,sizeof(buffer1));
-    // printf("%d\n",sock);
-
-    // recv(sock, buffer1, sizeof(buffer1),0);
-    // printf("Recieved: %s",buffer1);
 }
+
+
 
 int main() 
 {
-//     int sock=0;
 //     struct sockaddr_in serv_addr;
 //     char buffer[1024] = {0};
 
@@ -614,11 +611,7 @@ int main()
 //     // Receive the server's response
 //     recv(sock, buffer, sizeof(buffer),0);
 //     printf("Server response: %s\n", buffer);
-
-//     // recv(sock, buffer, sizeof(buffer),0);
-//     // printf("Server response: %s\n", buffer);
-//     printf("Sock: %d\n",sock);
-
+//     printf("Socket: %d\n",sock);
  pthread_t server_thread, client_thread;
 
     // Create a thread for handling server connections
