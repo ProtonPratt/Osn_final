@@ -17,6 +17,7 @@ int client_to_nm_port=5566;
 int num_ss=0;
 int num_clients=0;
 #define MAX_CLIENTS 5
+#define TIMEOUT_SECONDS 2
 
 // Define a structure to store client data
 struct SS_Info {
@@ -60,6 +61,80 @@ void removeLastSlash(char *path) {
         // Null-terminate the string at the last slash
         *lastSlash = '\0';
     }
+}
+
+void removeLastNewline(char *str) {
+    size_t len = strlen(str);
+
+    // Check if the string is not empty
+    if (len > 0) {
+        // Find the last occurrence of '\n'
+        char *lastNewline = strrchr(str, '\n');
+
+        // If '\n' is found, replace it with null terminator
+        if (lastNewline != NULL) {
+            *lastNewline = '\0';
+        }
+    }
+}
+
+void error(const char *msg) {
+    perror(msg);
+    exit(1);
+}
+
+ssize_t recv_with_timeout(int sockfd, void *buf, size_t len, int flags, int timeout_seconds) {
+    fd_set readfds;
+    struct timeval timeout;
+    ssize_t bytesRead;
+
+    FD_ZERO(&readfds);
+    FD_SET(sockfd, &readfds);
+
+    timeout.tv_sec = timeout_seconds;
+    timeout.tv_usec = 0;
+
+    int ready = select(sockfd + 1, &readfds, NULL, NULL, &timeout);
+
+    if (ready == -1) {
+        perror("Error in select");
+        exit(1);
+    } else if (ready == 0) {
+        // Timeout occurred
+        return 0;
+    } else {
+        // Socket is ready for reading
+        bytesRead = recv(sockfd, buf, len, flags);
+        return bytesRead;
+    }
+}
+
+
+void receive_and_send(int sender_socket, int server_socket) 
+{
+    // FILE *file = fopen(filename, "wb");
+    // if (!file) {
+    //     perror("Error creating file");
+    //     exit(1);
+    // }
+
+    char buffer[MAX_SS_PATH_LENGTH];
+    ssize_t bytesRead;
+
+    printf("Recived and sent\n");
+
+    bzero(buffer,sizeof(buffer));
+
+    while ((bytesRead = recv_with_timeout(server_socket, buffer, sizeof(buffer), 0,TIMEOUT_SECONDS)) > 0) 
+    {
+        // bzero(buffer,sizeof(buffer));
+        // bytesRead = recv(server_socket, buffer, sizeof(buffer), 0);
+        printf("Recived and sent %s\n",buffer);
+        send(sender_socket, buffer, bytesRead, 0);
+        bzero(buffer,sizeof(buffer));
+    }
+
+    // fclose(file);
 }
 
 
@@ -392,9 +467,10 @@ void *handle_client(void *arg)
 
         recv(clienta_socket, buffer, sizeof(buffer),0);
 
-        char ack[]="This is an ACK for the given command issued by the client";
-        // sleep(6);
-        send(clienta_socket,ack,sizeof(ack),0);
+        // char ack[]="This is an ACK for the given command issued by the client";
+        // // sleep(6);
+        // send(clienta_socket,ack,sizeof(ack),0);
+        // recv(clienta_socket,ack,sizeof(ack),0);
 
         pthread_mutex_lock(&mutex);
             
@@ -439,7 +515,7 @@ void *handle_client(void *arg)
                 printf("Sent Data: %s\n",data);
                 send(clienta_socket, data, sizeof(data), 0);
             }
-            else if(strncmp(buffer,"CREATE",6)==0 || strncmp(buffer,"DELETE",6)==0)
+            else if(strncmp(buffer,"CREATE",6)==0 || strncmp(buffer,"DELETE",6)==0 || strncmp(buffer,"COPY",4)==0)
             {
                 char *token;
                 int count = 0;
@@ -448,6 +524,8 @@ void *handle_client(void *arg)
 
                 token = strtok(buffer, " ");
                 char temp[MAX_SS_PATH_LENGTH];
+                char temp_big[MAX_SS_PATH_LENGTH];
+                char flag[5];
                 int temp_socket;
 
                 while(token!=NULL)
@@ -455,6 +533,16 @@ void *handle_client(void *arg)
                     if(count==1)
                     {
                         strcpy(temp,token);
+                    }
+
+                    if(count==2)
+                    {
+                        strcpy(temp_big,token);
+                    }
+
+                    if(count==3)
+                    {
+                        strcpy(flag,token);
                     }
 
                     token = strtok(NULL, " ");
@@ -471,7 +559,20 @@ void *handle_client(void *arg)
                     //         if(strcmp(ss_arr[i].paths[j],temp)==0)
                     //         {   
                     //             // printf("Temp Socket: %d\n",temp_socket);
-                    //             temp_socket=ss_arr[i].ss_socket;
+    void removeLastNewline(char *str) {
+    size_t len = strlen(str);
+
+    // Check if the string is not empty
+    if (len > 0) {
+        // Find the last occurrence of '\n'
+        char *lastNewline = strrchr(str, '\n');
+
+        // If '\n' is found, replace it with null terminator
+        if (lastNewline != NULL) {
+            *lastNewline = '\0';
+        }
+    }
+}                //             temp_socket=ss_arr[i].ss_socket;
                     //             printf("Temp Socket: %d\n",temp_socket);
                     //             break;
                     //         }
@@ -492,13 +593,13 @@ void *handle_client(void *arg)
                          strcpy(ss_arr[i].paths[k], ss_arr[i].paths[k + 1]);
                           }
 
-            // Decrease the number of paths in the array
-                          ss_arr[i].num_paths--;
+                                    // Decrease the number of paths in the array
+                                                ss_arr[i].num_paths--;
 
-                             break;
-        }
-    }
-}
+                                                    break;
+                                }
+                            }
+                        }
 
                     // printf("Buffer: %s\n",buffer);
                     send(temp_socket,buffer1,sizeof(buffer1),0);
@@ -506,6 +607,7 @@ void *handle_client(void *arg)
                     bzero(buffer1,sizeof(buffer1));
                     recv(temp_socket,buffer1,sizeof(buffer1),0);
                     send(clienta_socket, buffer1, sizeof(buffer1),0);
+                    printf("Sent: %s\n",buffer1);
 
                 }
 
@@ -537,6 +639,76 @@ void *handle_client(void *arg)
                     bzero(buffer1,sizeof(buffer1));
                     recv(temp_socket,buffer1,sizeof(buffer1),0);
                     send(clienta_socket, buffer1, sizeof(buffer1),0);
+                }
+
+                else if(strncmp(buffer,"COPY",4)==0)
+                {
+                    int temp_socket1,temp_socket2;
+                    for(int i=0;i<num_ss;i++)
+                    {
+                        for(int j=0;j<ss_arr[i].num_paths;j++)
+                        {
+                            // printf("Comp1: %s Comp2: %s\n",temp_path1,temp);
+
+                            if(strcmp(ss_arr[i].paths[j],temp)==0)
+                            {
+                                temp_socket1=ss_arr[i].ss_socket;
+                                printf("Temp Socket: %d\n",temp_socket1);
+                                break;
+                            }
+                        }
+                    }
+
+                    for(int i=0;i<num_ss;i++)
+                    {
+                        for(int j=0;j<ss_arr[i].num_paths;j++)
+                        {
+                            // printf("Comp1: %s Comp2: %s\n",temp_path1,temp);
+
+                            if(strcmp(ss_arr[i].paths[j],temp_big)==0)
+                            {
+                                temp_socket2=ss_arr[i].ss_socket;
+                                printf("Temp Socket: %d\n",temp_socket2);
+                                break;
+                            }
+                        }
+                    }
+
+                    // strcat(temp," ");
+                    // strcat(temp,flag);
+                    if(temp_socket1==temp_socket2)
+                    {
+                        strcat(buffer1," 2");
+                        strcat(buffer1,"\n");
+                        send(temp_socket1,buffer1,sizeof(buffer1),0);
+
+
+                    }
+                    else
+                    {
+                        strcat(buffer1," 0");
+                        strcat(buffer1,"\n");
+                        send(temp_socket1,buffer1,sizeof(buffer1),0);
+                        // strcat(temp," 0");
+                        // send(temp_socket1,temp,sizeof(temp),0);
+                        removeLastNewline(buffer1);
+                        strcat(buffer1," 1");
+                        strcat(buffer1,"\n");
+                        send(temp_socket2,buffer1,sizeof(buffer1),0);
+                        // strcat(temp_big," 1");
+                        // send(temp_socket2,temp_big,sizeof(temp_big),0);
+
+                        printf("Checkpoint 1\n");
+
+                        receive_and_send(temp_socket2,temp_socket1);
+
+                        printf("Checkpoint 2\n");
+
+                        bzero(buffer1,sizeof(buffer1));
+                        strcpy(buffer1,"STOP");
+                        send(clienta_socket, buffer1, sizeof(buffer1),0);
+                    }
+                    // recv()
                 }
             }
 
