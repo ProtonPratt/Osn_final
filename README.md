@@ -6,4 +6,8 @@
 2. Saideekshith Vaddineni
 3. Swaroop C
 
+## Description
+
+Implemented a network system that users can use to communicate files between each other. The main components are : Naming Server, Storage Server and Client 
+
 
