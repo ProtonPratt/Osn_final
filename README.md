@@ -189,7 +189,7 @@ The system consists of three main components:
          -./ss2 (Terminal 3 - Start Second Storage Server)
          -./client (Terminal 4 - Start Client)
 
-5. **Verification Steps**
+5. #**Verification Steps**
         -Check if Naming Server shows "Waiting for connections..."
         -Verify Storage Servers show successful registration
         -Test basic client commands:
@@ -199,10 +199,10 @@ The system consists of three main components:
                - READ test.txt
 
 6. **Troubleshooting**
-       -Check if ports 8080, 8081, 8082 are available
-       -Ensure all components are running in correct order
-       -Verify network connectivity between components
-       -Check system logs for error messages
+                 - Check if ports 8080, 8081, 8082 are available
+                  - Ensure all components are running in correct order
+                   -Verify network connectivity between components
+                   -Check system logs for error messages
 
 
 
