@@ -172,27 +172,48 @@ The system consists of three main components:
 
 # Implementation Details
 
-    Storage Server Registration
-        SS connects to NM on startup
-        Sends IP, port, and accessible paths
-        Maintains active connection for commands
+Storage Server Registration
+    SS connects to NM on startup
+    Sends IP, port, and accessible paths
+    Maintains active connection for commands
 
-    Client Operations
-        Connects to NM for initial request
-        Gets SS details for file operations
-        Direct connection to SS for data transfer
+Client Operations
+    Connects to NM for initial request
+    Gets SS details for file operations
+    Direct connection to SS for data transfer
 
-    File Operations Flow
-        Client sends command to NM
-        NM identifies appropriate SS
-        Client connects to SS directly
-        SS performs operation and sends response
-        Connection closes after operation
+File Operations Flow
+    Client sends command to NM
+    NM identifies appropriate SS
+    Client connects to SS directly
+    SS performs operation and sends response
+    Connection closes after operation
 
-    Directory Management
-        Recursive directory creation/deletion
-        Path validation and management
-        Concurrent access control
+Directory Management
+    Recursive directory creation/deletion
+    Path validation and management
+    Concurrent access control
+
+# Testing
+
+Start the naming server
+Start multiple storage servers with different directories
+Connect multiple clients
+Test various file operations:
+Create files and directories
+Write content to files
+Read file contents
+Delete files and directories
+Get file information
+
+# Future Enhancements
+
+File replication for redundancy
+Load balancing across storage servers
+Enhanced security features
+Support for file locking mechanisms
+Improved error recovery
+Copy operations between storage servers
 
 
 
