@@ -148,6 +148,64 @@ The system consists of three main components:
    - Failed operations return error messages to Client
    - System maintains consistency through mutex locks
 
+## Detailed Setup Guide
+
+
+1. **System Requirements**
+
+   - Linux/Unix-based system
+
+   - GCC compiler
+
+   - pthread library
+
+   - Minimum 512MB RAM
+
+   - Network connectivity between machines (if running distributed)
+
+
+2. **Directory Structure Setup**
+
+   ```bash
+
+   mkdir test1 test2    # Create directories for storage servers
+
+   touch test1/ss1.txt  # Create initial files if needed
+
+   touch test2/ss2.txt
+3. **Compilation Steps**
+   
+         -make all (or)
+   
+         -gcc nm.c -o nm -pthread
+         
+         -gcc test1/ss1.c -o ss1 -pthread
+         
+         -gcc test2/ss2.c -o ss2 -pthread
+4. **Running the System**
+   
+         -./nm (Terminal 1 - Start Naming Server)
+         -./ss1 (Terminal 2 - Start First Storage Server)
+         -./ss2 (Terminal 3 - Start Second Storage Server)
+         -./client (Terminal 4 - Start Client)
+
+5. **Verification Steps**
+        -Check if Naming Server shows "Waiting for connections..."
+        -Verify Storage Servers show successful registration
+        -Test basic client commands:
+   
+               - CREATE test.txt -f
+               - WRITE test.txt "Hello World"
+               - READ test.txt
+
+6. **Troubleshooting**
+       -Check if ports 8080, 8081, 8082 are available
+       -Ensure all components are running in correct order
+       -Verify network connectivity between components
+       -Check system logs for error messages
+
+
+
 # Implementation Details
 
 - Storage Server Registration
@@ -191,7 +249,9 @@ The system consists of three main components:
  - Enhanced security features
  - Support for file locking mechanisms
  - Improved error recovery
- - Copy operations between storage servers
+ - Add support for IPv6 addressing
+ - Health monitoring system
+
 
 
 
