@@ -189,10 +189,10 @@ The system consists of three main components:
          -./ss2 (Terminal 3 - Start Second Storage Server)
          -./client (Terminal 4 - Start Client)
 
-5. #**Verification Steps**
-        -Check if Naming Server shows "Waiting for connections..."
-        -Verify Storage Servers show successful registration
-        -Test basic client commands:
+5. **Verification Steps**
+                - Check if Naming Server shows "Waiting for connections..."
+                - Verify Storage Servers show successful registration
+                - Test basic client commands:
    
                - CREATE test.txt -f
                - WRITE test.txt "Hello World"
