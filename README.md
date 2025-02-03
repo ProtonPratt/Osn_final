@@ -122,53 +122,31 @@ The system consists of three main components:
    - File permissions and metadata handling
 
 
-### Setup and Installation
+## Control Flow
 
+1. **System Startup**
+   - Start Naming Server first (./nm)
+   - Start Storage Servers (./ss1, ./ss2)
+   - Storage Servers register with Naming Server
+   - Clients can then connect
 
-1. **Prerequisites**
+2. **Client Operation Flow**
+   a. Client Request:
+      - Client sends command to Naming Server
+      - Naming Server validates request
+      - Naming Server identifies appropriate Storage Server
+   
+   b. File Operation:
+      - Naming Server sends Storage Server details to Client
+      - Client establishes direct connection with Storage Server
+      - Storage Server performs requested operation
+      - Results returned to Client
+      - Connection closes
 
-   - GCC Compiler
-
-   - POSIX-compliant system (Linux/Unix)
-
-   - pthread library
-
-
-2. **Compilation**
-
-   ```bash
-
-   #Compile Naming Server
-
-   gcc nm.c -o nm -pthread
-
-
-   # Compile Storage Servers
-
-   gcc test1/ss1.c -o ss1 -pthread
-
-   gcc test2/ss2.c -o ss2 -pthread
-
-
-   # Compile Client
-
-   gcc client.c -o client
-
-# Start Naming Server first
-
-./nm
-
-
-# Start Storage Servers (in separate terminals)
-
-./ss1
-
-./ss2
-
-
-# Start Client(s)
-
-./client
+3. **Error Handling Flow**
+   - Connection failures trigger 5-second timeout
+   - Failed operations return error messages to Client
+   - System maintains consistency through mutex locks
 
 # Implementation Details
 
