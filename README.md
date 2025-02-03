@@ -190,19 +190,20 @@ The system consists of three main components:
          -./client (Terminal 4 - Start Client)
 
 5. **Verification Steps**
+   
                 - Check if Naming Server shows "Waiting for connections..."
                 - Verify Storage Servers show successful registration
                 - Test basic client commands:
-   
-               - CREATE test.txt -f
-               - WRITE test.txt "Hello World"
-               - READ test.txt
+                     - CREATE test.txt -f
+                     - WRITE test.txt "Hello World"
+                     - READ test.txt
 
-6. **Troubleshooting**
+7. **Troubleshooting**
+   
                  - Check if ports 8080, 8081, 8082 are available
-                  - Ensure all components are running in correct order
-                   -Verify network connectivity between components
-                   -Check system logs for error messages
+                 - Ensure all components are running in correct order
+                 - Verify network connectivity between components
+                 - Check system logs for error messages
 
 
 
