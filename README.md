@@ -1,6 +1,6 @@
-# Osn_final
 
-# Distributed File System
+
+# Distributed Network File System
 
 
 A distributed network system that enables users to communicate and manage files across multiple storage servers through a centralized naming server.
