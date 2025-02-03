@@ -172,7 +172,7 @@ The system consists of three main components:
 
 # Implementation Details
 
-    # Storage Server Registration
+    Storage Server Registration
         SS connects to NM on startup
         Sends IP, port, and accessible paths
         Maintains active connection for commands
