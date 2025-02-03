@@ -196,24 +196,24 @@ Directory Management
 
 # Testing
 
--Start the naming server
--Start multiple storage servers with different directories
--Connect multiple clients
--Test various file operations:
--Create files and directories
--Write content to files
--Read file contents
--Delete files and directories
--Get file information
+ - Start the naming server
+ - Start multiple storage servers with different directories
+ - Connect multiple clients
+ - Test various file operations:
+ - Create files and directories
+ - Write content to files
+ - Read file contents
+ - Delete files and directories
+ - Get file information
 
 # Future Enhancements
 
--File replication for redundancy
--Load balancing across storage servers
--Enhanced security features
--Support for file locking mechanisms
--Improved error recovery
--Copy operations between storage servers
+ - File replication for redundancy
+ - Load balancing across storage servers
+ - Enhanced security features
+ - Support for file locking mechanisms
+ - Improved error recovery
+ - Copy operations between storage servers
 
 
 
